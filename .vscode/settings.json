@@ -1,0 +1,30 @@
+{
+  "files.exclude": {
+      ".eggs": true,
+      ".mypy_cache": true,
+      ".tox": true,
+      ".vscode": true,
+      "*.egg-info": true,
+      "*.lock": true,
+      ".coverage": true,
+      "build": true
+  },
+
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.formatting.provider": "black",
+  "python.formatting.blackArgs": ["--line-length", "80"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+
+  "python.pythonPath": "${workspaceFolder}/.venv/bin/python3.8",
+  "python.autoComplete.extraPaths": [
+      "${workspaceFolder}",
+      "${workspaceFolder}/.venv/lib/python3.8",
+      "${workspaceFolder}/.venv/lib/python3.8/site-packages"
+  ],
+
+  "[python]": {
+      "editor.formatOnSave": true
+  }
+}
