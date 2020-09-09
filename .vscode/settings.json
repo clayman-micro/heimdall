@@ -1,13 +1,17 @@
 {
   "files.exclude": {
-      ".eggs": true,
-      ".mypy_cache": true,
-      ".tox": true,
-      ".vscode": true,
-      "*.egg-info": true,
-      "*.lock": true,
-      ".coverage": true,
-      "build": true
+    ".eggs": true,
+    ".mypy_cache": true,
+    ".tox": true,
+    ".vscode": true,
+    "*.egg-info": true,
+    "*.lock": true,
+    ".coverage": true,
+    "build": true
+  },
+
+  "files.associations": {
+    "**/*.yml": "ansible"
   },
 
   "python.linting.enabled": true,
@@ -19,12 +23,18 @@
 
   "python.pythonPath": "${workspaceFolder}/.venv/bin/python3.8",
   "python.autoComplete.extraPaths": [
-      "${workspaceFolder}",
-      "${workspaceFolder}/.venv/lib/python3.8",
-      "${workspaceFolder}/.venv/lib/python3.8/site-packages"
+    "${workspaceFolder}",
+    "${workspaceFolder}/.venv/lib/python3.8",
+    "${workspaceFolder}/.venv/lib/python3.8/site-packages"
+  ],
+
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/.venv/lib/python3.8",
+    "${workspaceFolder}/.venv/lib/python3.8/site-packages"
   ],
 
   "[python]": {
-      "editor.formatOnSave": true
+    "editor.formatOnSave": true
   }
 }
