@@ -19,7 +19,7 @@ COPY --from=build /app/dist/*.whl .
 
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && apt-get install -y -q \
-      build-essential python3-dev libffi-dev git && \
+      build-essential python3-dev libffi-dev curl git && \
     python3 -m pip install --no-cache-dir --quiet -U pip && \
     python3 -m pip install --no-cache-dir --quiet *.whl && \
     rm -f *.whl && \
@@ -27,6 +27,9 @@ RUN DEBIAN_FRONTEND=noninteractive \
     apt autoremove -y --quiet
 
 EXPOSE 5000
+
+HEALTHCHECK --interval=1m --timeout=3s \
+  CMD curl -f http://localhost:5000/-/health || exit 1
 
 ENTRYPOINT ["python3", "-m", "heimdall"]
 
