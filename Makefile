@@ -36,7 +36,19 @@ lint:
 	poetry run mypy src/heimdall tests
 
 run:
-	poetry run python3 -m heimdall --debug server run -t develop
+	poetry run python3 -m heimdall --conf-dir=./conf --debug server run --host=0.0.0.0 \
+		-t 'develop' \
+		-t 'traefik.enable=true' \
+		-t 'traefik.http.routers.heimdall.rule=Host(`wallet.dev.clayman.pro`, `shortner.dev.clayman.pro`, `passport.dev.clayman.pro`)' \
+		-t 'traefik.http.routers.heimdall.entrypoints=web' \
+		-t 'traefik.http.routers.heimdall.service=heimdall' \
+		-t 'traefik.http.routers.heimdall.middlewares=heimdall-redirect@consulcatalog' \
+		-t 'traefik.http.routers.heimdall-secure.rule=Host(`wallet.dev.clayman.pro`, `shortner.dev.clayman.pro`, `passport.dev.clayman.pro`)' \
+		-t 'traefik.http.routers.heimdall-secure.entrypoints=websecure' \
+		-t 'traefik.http.routers.heimdall-secure.service=heimdall' \
+		-t 'traefik.http.routers.heimdall-secure.tls=true' \
+		-t 'traefik.http.middlewares.heimdall-redirect.redirectscheme.scheme=https' \
+		-t 'traefik.http.middlewares.heimdall-redirect.redirectscheme.permanent=true'
 
 test:
 	tox
