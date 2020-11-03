@@ -1,9 +1,12 @@
 from typing import Optional
 
-import config
+import config  # type: ignore
 from aiohttp import ClientSession, ClientTimeout, web
 from aiohttp_metrics import setup as setup_metrics  # type: ignore
-from aiohttp_micro import AppConfig as BaseConfig, setup as setup_micro
+from aiohttp_micro import (  # type: ignore
+    AppConfig as BaseConfig,
+    setup as setup_micro
+)
 
 
 class ServiceConfig(config.Config):

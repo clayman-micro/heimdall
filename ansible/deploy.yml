@@ -1,54 +1,99 @@
-
 ---
+
+- hosts: localhost
+  tasks:
+    - name: Prepare folder for credentials
+      file:
+        path: "{{ inventory_dir }}/.credentials/{{ item }}/users/{{ hostvars[item]['ansible_user'] }}/"
+        state: directory
+        mode: 0755
+      with_items: "{{ groups['servers'] }}"
+
+    - name: Download private keys for servers
+      hashivault_read:
+        mount_point: "secrets"
+        secret: "nodes/{{ item }}/users/{{ hostvars[item]['ansible_user'] }}"
+        key: 'private_key'
+        version: 2
+      with_items: "{{ groups['servers'] }}"
+      loop_control:
+        label: "{{ item }}"
+      register: 'private_keys'
+
+    - name: Write private key to file
+      copy:
+        content: "{{ item.value }}"
+        dest: "{{ inventory_dir }}/.credentials/{{ item.item }}/users/{{ hostvars[item.item]['ansible_user'] }}/id_rsa"
+        mode: 0600
+      with_items: "{{ private_keys.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
 
 - hosts: servers
   become: true
 
   vars:
-    domain: clayman.pro
-
     consul_host: "consul.service.consul"
     consul_port: "8500"
 
+    docker_registry: ghcr.io
+    docker_username: "{{ lookup('hashivault', 'services/ghcr', 'user', mount_point='/secrets', version=2) }}"
+    docker_password: "{{ lookup('hashivault', 'services/ghcr', 'password', mount_point='/secrets', version=2) }}"
+
     private_network: "{{ ansible_eth1['ipv4'] }}"
 
-    image: ghcr.io/clayman-micro/heimdall
+    services_dir: /opt/services
 
-    version: "{{ lookup('env','VERSION')|default('latest') }}"
+    heimdall_sentry_dsn: "{{ lookup('hashivault', 'services/heimdall', 'sentry_dsn', mount_point='/secrets', version=2) }}"
 
-    replicas: "{{ lookup('env', 'REPLICAS')|default(1) }}"
+    heimdall_image: ghcr.io/clayman-micro/heimdall
+    heimdall_version: "{{ lookup('env','HEIMDALL_VERSION')|default('latest') }}"
+
+    heimdall_replicas: 1
 
   tasks:
+    - name: Log into private registry
+      docker_login:
+        registry: "{{ docker_registry }}"
+        username: "{{ docker_username }}"
+        password: "{{ docker_password }}"
+
     - name: Pull image
       docker_image:
-        name: "{{ image }}:{{ version }}"
+        name: "{{ heimdall_image }}:{{ heimdall_version }}"
         source: pull
 
     - name: Update service
       docker_swarm_service:
-
         name: heimdall
-
-        image: "{{ image }}:{{ version }}"
-        command: python3 -m shortner server run
+        image: "{{ heimdall_image }}:{{ heimdall_version }}"
+        command: python3 -m heimdall server run --host=0.0.0.0
         args:
           - "--tags={{ env }}"
+          - "--tags=traefik.enable=true"
+          - "--tags=traefik.http.routers.heimdall.rule=Host(`{{ passport_domain }}`)"
+          - "--tags=traefik.http.routers.heimdall.entrypoints=web"
+          - "--tags=traefik.http.routers.heimdall.service=heimdall"
+          - "--tags=traefik.http.routers.heimdall.middlewares=heimdall-redirect@consulcatalog"
+          - "--tags=traefik.http.middlewares.heimdall-redirect.redirectscheme.scheme=https"
+          - "--tags=traefik.http.middlewares.heimdall-redirect.redirectscheme.permanent=true"
+          - "--tags=traefik.http.routers.heimdall-secure.rule=Host(`{{ passport_domain }}`)"
+          - "--tags=traefik.http.routers.heimdall-secure.entrypoints=websecure"
+          - "--tags=traefik.http.routers.heimdall-secure.service=heimdall"
+          - "--tags=traefik.http.routers.heimdall-secure.tls=true"
+          - "--tags=traefik.http.routers.heimdall-secure.tls.certresolver=acmeresolver"
         dns:
           - "{{ private_network.address }}"
         env:
           CONSUL_HOST: "{{ consul_host }}"
           CONSUL_PORT: "{{ consul_port }}"
+          SENTRY_DSN: "{{ heimdall_sentry_dsn }}"
         logging:
           driver: syslog
           options:
             syslog-address: unixgram:///dev/log
-
             tag: heimdall
-
         networks:
           - backend
-        replicas: "{{ replicas }}"
-        limits:
-          cpus: '0.50'
-          memory: 64M
-
+        replicas: "{{ heimdall_replicas|default(1) }}"

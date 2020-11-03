@@ -4,7 +4,7 @@ import click
 import structlog  # type: ignore
 import uvloop  # type: ignore
 from aiohttp_micro.management.server import server  # type: ignore
-from config import (
+from config import (  # type: ignore
     ConsulConfig,
     EnvValueProvider,
     FileValueProvider,
