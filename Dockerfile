@@ -1,8 +1,8 @@
-FROM python:3.8-slim as build
+FROM python:3.9-slim as build
 
 RUN DEBIAN_FRONTEND=noninteractive \
-    apt-get update && apt-get install -y -q \
-      build-essential python3-dev libffi-dev git && \
+    apt-get update && apt-get install -y -qq \
+      build-essential python3-dev libffi-dev git > /dev/null && \
     python3 -m pip install --no-cache-dir --quiet -U pip && \
     python3 -m pip install --no-cache-dir --quiet poetry
 
@@ -13,18 +13,18 @@ WORKDIR /app
 RUN poetry build
 
 
-FROM python:3.8-slim
+FROM python:3.9-slim
 
 COPY --from=build /app/dist/*.whl .
 
 RUN DEBIAN_FRONTEND=noninteractive \
-    apt-get update && apt-get install -y -q \
-      build-essential python3-dev libffi-dev curl git && \
+    apt-get update && apt-get install -y -qq \
+      build-essential python3-dev libffi-dev libpq-dev git curl > /dev/null && \
     python3 -m pip install --no-cache-dir --quiet -U pip && \
     python3 -m pip install --no-cache-dir --quiet *.whl && \
     rm -f *.whl && \
-    apt remove -y --quiet build-essential python3-dev libffi-dev git && \
-    apt autoremove -y --quiet
+    apt remove -y -qq build-essential python3-dev libffi-dev git > /dev/null && \
+    apt autoremove -y -qq > /dev/null
 
 EXPOSE 5000
 
