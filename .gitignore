@@ -52,5 +52,6 @@ nosetests.xml
 .venv
 .vscode/.ropeproject
 .vscode/tags
+ansible/.credentials
 *.retry
 conf/**/*

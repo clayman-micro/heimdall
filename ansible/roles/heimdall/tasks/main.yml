@@ -1,0 +1,69 @@
+---
+
+- name: Prepare service folder
+  file: path="{{ services_dir }}/heimdall" mode=0755 state=directory
+
+- name: Assemble config file
+  template: src="config.json.j2" dest="{{ services_dir }}/heimdall/config.json" mode=0644
+
+- name: Get contents of config file
+  command: cat {{ services_dir }}/heimdall/config.json
+  register: heimdall_config
+
+- name: Create config
+  docker_config:
+    name: heimdall_{{ heimdall_version }}
+    data: "{{ heimdall_config.stdout | b64encode }}"
+    data_is_b64: true
+    state: present
+
+- name: Log into private registry
+  docker_login:
+    registry: "{{ docker_registry }}"
+    username: "{{ docker_username }}"
+    password: "{{ docker_password }}"
+
+- name: Pull image
+  docker_image:
+    name: "{{ heimdall_image }}:{{ heimdall_version }}"
+    source: pull
+
+- name: Update service
+  docker_swarm_service:
+    name: heimdall
+    image: "{{ heimdall_image }}:{{ heimdall_version }}"
+    command: python3 -m heimdall --conf-dir=/etc/heimdall server run --host=0.0.0.0
+    args:
+      - "--tags={{ env }}"
+      - "--tags=traefik.enable=true"
+      - "--tags=traefik.http.routers.heimdall.rule=Host({{ heimdall_domain }})"
+      - "--tags=traefik.http.routers.heimdall.entrypoints=web"
+      - "--tags=traefik.http.routers.heimdall.service=heimdall"
+      - "--tags=traefik.http.routers.heimdall.middlewares=heimdall-redirect@consulcatalog"
+
+      - "--tags=traefik.http.middlewares.heimdall-redirect.redirectscheme.scheme=https"
+      - "--tags=traefik.http.middlewares.heimdall-redirect.redirectscheme.permanent=true"
+
+      - "--tags=traefik.http.routers.heimdall-secure.rule=Host({{ heimdall_domain }})"
+      - "--tags=traefik.http.routers.heimdall-secure.entrypoints=websecure"
+      - "--tags=traefik.http.routers.heimdall-secure.service=heimdall"
+      - "--tags=traefik.http.routers.heimdall-secure.tls=true"
+      - "--tags=traefik.http.routers.heimdall-secure.tls.certresolver=acmeresolver"
+    dns:
+      - "{{ private_network.address }}"
+    env:
+      CONSUL_HOST: "{{ consul_host }}"
+      CONSUL_PORT: "{{ consul_port }}"
+      SENTRY_DSN: "{{ heimdall_sentry_dsn }}"
+    logging:
+      driver: syslog
+      options:
+        syslog-address: unixgram:///dev/log
+        tag: heimdall
+    networks:
+      - backend
+    replicas: "{{ heimdall_replicas|default(1) }}"
+    configs:
+      - config_name: "heimdall_{{ heimdall_version }}"
+        filename: "/etc/heimdall/config.json"
+        mode: 0600
