@@ -1,11 +1,10 @@
 from pathlib import Path
 
 import click
-import structlog  # type: ignore
 import uvloop  # type: ignore
-from aiohttp_micro.management.server import server  # type: ignore
+from aiohttp_micro import ConsulConfig
+from aiohttp_micro.cli.server import server  # type: ignore
 from config import (  # type: ignore
-    ConsulConfig,
     EnvValueProvider,
     FileValueProvider,
     load,
@@ -13,15 +12,6 @@ from config import (  # type: ignore
 )
 
 from heimdall.app import AppConfig, init
-
-
-structlog.configure(
-    processors=[
-        structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.JSONRenderer(),
-    ]
-)
 
 
 @click.group()

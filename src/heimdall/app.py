@@ -2,10 +2,11 @@ from typing import Optional
 
 import config  # type: ignore
 from aiohttp import ClientSession, ClientTimeout, web
-from aiohttp_metrics import setup as setup_metrics  # type: ignore
 from aiohttp_micro import (  # type: ignore
     AppConfig as BaseConfig,
-    setup as setup_micro
+    setup as setup_micro,
+    setup_logging,
+    setup_metrics,
 )
 
 
@@ -24,9 +25,7 @@ class AppConfig(BaseConfig):
     services = config.NestedField[ServicesConfig](ServicesConfig)
 
 
-async def remote(
-    host: str, request: web.Request, access_token: Optional[str] = None
-) -> web.Response:
+async def remote(host: str, request: web.Request, access_token: Optional[str] = None) -> web.Response:
     body = None
     if request.can_read_body:
         body = await request.read()
@@ -41,7 +40,7 @@ async def remote(
         "Call remote service",
         host=host,
         cookies=request.cookies,
-        headers=headers,
+        # headers=headers,
         method=request.method,
         url=request.rel_url,
         body=body,
@@ -49,11 +48,7 @@ async def remote(
 
     async with ClientSession() as session:
         async with session.request(
-            request.method,
-            url,
-            headers=headers,
-            data=body,
-            timeout=ClientTimeout(total=60),
+            request.method, url, headers=headers, data=body, timeout=ClientTimeout(total=60),
         ) as resp:
             raw = await resp.read()
 
@@ -61,7 +56,7 @@ async def remote(
                 "Receive remote service response",
                 host=host,
                 cookies=request.cookies,
-                headers=headers,
+                # headers=headers,
                 method=request.method,
                 url=request.rel_url,
             )
@@ -69,9 +64,7 @@ async def remote(
     return web.Response(body=raw, status=resp.status, headers=resp.headers)
 
 
-async def fetch_access_token(
-    request: web.Request, timeout: ClientTimeout
-) -> Optional[str]:
+async def fetch_access_token(request: web.Request, timeout: ClientTimeout) -> Optional[str]:
     config: AppConfig = request.app["config"]
     logger = request.app["logger"]
 
@@ -118,20 +111,12 @@ async def proxy(request: web.Request) -> web.Response:
         response = await remote(config.passport.backend, request)
     elif request.host in request.app["services"]:
         if not access_token:
-            access_token = await fetch_access_token(
-                request, timeout=ClientTimeout(total=60)
-            )
+            access_token = await fetch_access_token(request, timeout=ClientTimeout(total=60))
 
-        response = await remote(
-            request.app["services"][request.host],
-            request,
-            access_token=access_token,
-        )
+        response = await remote(request.app["services"][request.host], request, access_token=access_token,)
     else:
         logger.error(
-            "Attempt to call unknown service",
-            host=request.host,
-            url=request.rel_url,
+            "Attempt to call unknown service", host=request.host, url=request.rel_url,
         )
         raise web.HTTPBadGateway()
 
@@ -150,6 +135,8 @@ def init(app_name: str, config: AppConfig) -> web.Application:
     app["services"] = services
 
     setup_micro(app, app_name, config)
+
+    setup_logging(app)
     setup_metrics(app)
 
     app.router.add_route("*", "/{path:.*}", proxy)
