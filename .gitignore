@@ -55,3 +55,7 @@ nosetests.xml
 ansible/.credentials
 *.retry
 conf/**/*
+
+
+# Ignore DevSpace cache and log folder
+.devspace/

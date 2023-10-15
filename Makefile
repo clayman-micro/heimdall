@@ -1,10 +1,12 @@
-.PHONY: build clean clean-test clean-pyc clean-build proto
+.PHONY: build clean tests
 
-NAME	:= ghcr.io/clayman-micro/heimdall
-VERSION ?= latest
+NAME		:= ghcr.io/clayman-micro/heimdall
+VERSION		?= latest
+NAMESPACE	?= micro
+HOST 		?= 0.0.0.0
+PORT 		?= 5000
 
-
-clean: clean-build clean-image clean-pyc clean-test
+clean: clean-build clean-pyc clean-test
 
 clean-build:
 	rm -fr build/
@@ -12,9 +14,6 @@ clean-build:
 	rm -fr .eggs/
 	find . -name '*.egg-info' -exec rm -fr {} +
 	find . -name '*.egg' -exec rm -f {} +
-
-clean-image:
-	docker images -qf dangling=true | xargs docker rmi
 
 clean-pyc:
 	find . -name '*.pyc' -exec rm -f {} +
@@ -31,43 +30,34 @@ clean-test:
 install: clean
 	poetry install
 
-lint:
-	poetry run flake8 src/heimdall tests
+format:
+	poetry run ruff --select I --fix src/heimdall tests
+	poetry run black src/heimdall tests
+
+check_black:
+	@echo Check project with Black formatter.
+	poetry run black --check src/heimdall tests
+
+check_mypy:
+	@echo Check project with Mypy typechecker.
 	poetry run mypy src/heimdall tests
 
+check_ruff:
+	@echo Check project with Ruff linter.
+	poetry run ruff --show-source --no-fix src/heimdall tests
+
+lint: check_black check_ruff check_mypy
+
 run:
-	poetry run python3 -m heimdall --conf-dir=./conf --debug server run --host=0.0.0.0 \
-		-t 'develop' \
-		-t 'traefik.enable=true' \
-		-t 'traefik.http.routers.heimdall.rule=Host(`wallet.dev.clayman.pro`, `shortner.dev.clayman.pro`, `passport.dev.clayman.pro`)' \
-		-t 'traefik.http.routers.heimdall.entrypoints=web' \
-		-t 'traefik.http.routers.heimdall.service=heimdall' \
-		-t 'traefik.http.routers.heimdall.middlewares=heimdall-redirect@consulcatalog' \
-		-t 'traefik.http.routers.heimdall-secure.rule=Host(`wallet.dev.clayman.pro`, `shortner.dev.clayman.pro`, `passport.dev.clayman.pro`)' \
-		-t 'traefik.http.routers.heimdall-secure.entrypoints=websecure' \
-		-t 'traefik.http.routers.heimdall-secure.service=heimdall' \
-		-t 'traefik.http.routers.heimdall-secure.tls=true' \
-		-t 'traefik.http.middlewares.heimdall-redirect.redirectscheme.scheme=https' \
-		-t 'traefik.http.middlewares.heimdall-redirect.redirectscheme.permanent=true'
+	poetry run python3 -m heimdall --debug server run --host=$(HOST) --port=$(PORT)
 
-test:
-	tox
-
-dist: clean-build
-	poetry build
+tests:
+	poetry run pytest
 
 build:
 	docker build -t ${NAME} .
 	docker tag ${NAME} ${NAME}:$(VERSION)
 
-publish: build
+publish:
 	docker login -u $(DOCKER_USER) -p $(DOCKER_PASS) ghcr.io
-	docker push ${NAME}:$(VERSION)
-
-deploy:
-	docker run --rm -it -v ${PWD}:/github/workspace --workdir /github/workspace \
-		-e HEIMDALL_VERSION=$(VERSION) \
-		-e VAULT_ADDR=$(VAULT_ADDR) \
-		-e VAULT_ROLE_ID=$(VAULT_ROLE_ID) \
-		-e VAULT_SECRET_ID=$(VAULT_SECRET_ID) \
-		ghcr.io/clayman-micro/action-deploy -i ansible/inventory ansible/deploy.yml
+	docker push ${NAME}

@@ -1,4 +1,4 @@
-FROM python:3.9-slim as build
+FROM python:3.11-slim as build
 
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && apt-get install -y -qq \
@@ -13,13 +13,13 @@ WORKDIR /app
 RUN poetry build
 
 
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 COPY --from=build /app/dist/*.whl .
 
 RUN DEBIAN_FRONTEND=noninteractive \
     apt-get update && apt-get install -y -qq \
-      build-essential python3-dev libffi-dev libpq-dev git curl > /dev/null && \
+      build-essential python3-dev libffi-dev git curl > /dev/null && \
     python3 -m pip install --no-cache-dir --quiet -U pip && \
     python3 -m pip install --no-cache-dir --quiet *.whl && \
     rm -f *.whl && \
@@ -33,4 +33,4 @@ HEALTHCHECK --interval=1m --timeout=3s \
 
 ENTRYPOINT ["python3", "-m", "heimdall"]
 
-CMD [ "server", "run" ]
+CMD [ "server", "run", "--host", "0.0.0.0" ]
