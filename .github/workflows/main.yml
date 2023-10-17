@@ -137,3 +137,49 @@ jobs:
           to: ${{ secrets.TELEGRAM_CHAT }}
           token: ${{ secrets.TELEGRAM_SECRET }}
           args: ${{ github.repository }} build version `${{ github.ref_name }}` - ${{ job.status }}
+
+  deploy_to_staging:
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'master'
+    environment:
+      name: staging
+      url: https://staging.clayman.pro/api
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Get commit short sha
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        if: github.event_name != 'pull_request'
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.repository_owner }}/helm-chart
+          event-type: deploy_release
+          client-payload: '{"image_tag": "${{ steps.vars.outputs.sha_short }}", "app": "${{ env.APP_NAME }}", "env": "staging"}'
+
+  deploy_to_production:
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags')
+    environment:
+      name: production
+      url: https://clayman.pro/api
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Get commit short sha
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        if: github.event_name != 'pull_request'
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.repository_owner }}/helm-chart
+          event-type: deploy_release
+          client-payload: '{"image_tag": "${{ github.ref_name }}", "app": "${{ env.APP_NAME }}", "env": "production"}'

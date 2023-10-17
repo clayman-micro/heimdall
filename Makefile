@@ -2,7 +2,6 @@
 
 NAME		:= ghcr.io/clayman-micro/heimdall
 VERSION		?= latest
-NAMESPACE	?= micro
 HOST 		?= 0.0.0.0
 PORT 		?= 5000
 
